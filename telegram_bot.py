@@ -10,10 +10,22 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 import pytz
+from flask import Flask
+import threading
 
 load_dotenv()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Tiny Flask app to satisfy Render health check (Free Tier Web Service)
+app_flask = Flask(__name__)
+@app_flask.route('/')
+def health_check():
+    return "Bot is alive!", 200
+
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app_flask.run(host='0.0.0.0', port=port)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Hello! I am your Real Estate Auto-Bot. Send 'run report' to trigger the full pipeline end-to-end.")
@@ -144,10 +156,12 @@ def main():
     scheduler.add_job(scheduled_report, CronTrigger(day_of_week='mon', hour=9, minute=0), args=[ContextTypes.DEFAULT_TYPE])
     scheduler.start()
     
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, run_report))
+    # Start Flask in a background thread
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
     
-    print("Telegram Bot is active 24/7 on Railway. Monday 9am UAE reports scheduled.")
+    print("Telegram Bot is active 24/7. Monday 9am UAE reports scheduled.")
+    print(f"Health check server started on port {os.environ.get('PORT', 10000)}")
     app.run_polling()
 
 if __name__ == '__main__':
