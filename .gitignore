@@ -17,3 +17,5 @@ content_opportunities.json
 report.md
 report.pdf
 credentials.json
+bot.log
+*.log

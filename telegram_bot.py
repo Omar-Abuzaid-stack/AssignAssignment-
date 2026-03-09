@@ -33,7 +33,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def run_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.lower().strip()
     if text == "run report":
-        await update.message.reply_text("🚀 Starting pipeline... This takes a few minutes.\n\n(1/6) Collecting videos (yt-dlp, Instaloader, Playwright)...")
+        await update.message.reply_text("🚀 Starting pipeline... This takes a few minutes.\n\n(1/6) Collecting videos (TikTok, Instagram, Facebook)...")
         
         try:
             proc = await asyncio.create_subprocess_exec("python3", "execution/collect_videos.py")
@@ -160,7 +160,7 @@ def main():
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     
-    print("Telegram Bot is active 24/7. Monday 9am UAE reports scheduled.")
+    print("Telegram Bot is active 24/7. Monday 9am UAE reports scheduled (TikTok, IG, FB).")
     print(f"Health check server started on port {os.environ.get('PORT', 10000)}")
     app.run_polling()
 

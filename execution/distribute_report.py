@@ -16,12 +16,12 @@ def generate_markdown(videos, output_path):
         
     date_str = datetime.now().strftime("%Y-%m-%d")
     md_content = f"# Trending Real Estate Videos in UAE ({date_str})\n\n"
-    md_content += "This report contains the top trending UAE real estate videos (Dubai, Abu Dhabi, etc.) tracked across YouTube Shorts and TikTok.\n"
+    md_content += "This report contains the top trending UAE real estate videos (Dubai, Abu Dhabi, etc.) tracked across TikTok, Instagram, and Facebook.\n"
     md_content += "---\n\n"
     
     md_content = f"# Trending Real Estate Videos — {date_str}\n\n"
     md_content += "## 📈 Weekly Market Summary\n"
-    md_content += f"This report analyzes trending content across TikTok, Instagram, Facebook, and YouTube Shorts focusing on the UAE Real Estate market. Total videos analyzed: {len(videos)}.\n\n"
+    md_content += f"This report analyzes trending content across TikTok, Instagram, and Facebook focusing on the UAE Real Estate market. Total videos analyzed: {len(videos)}.\n\n"
     
     # Check for errors
     if os.path.exists(".tmp/scrape_errors.log"):
@@ -31,7 +31,7 @@ def generate_markdown(videos, output_path):
                 md_content += "### ⚠️ Platform Advisory\n"
                 md_content += f"The following platforms encountered collection issues and may have limited data:\n{errors}\n\n"
 
-    platforms = ["tiktok", "instagram", "facebook", "youtube"]
+    platforms = ["tiktok", "instagram", "facebook"]
     
     for p in platforms:
         p_vids = [v for v in videos if v.get("platform") == p][:10]

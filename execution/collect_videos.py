@@ -49,6 +49,17 @@ async def get_yt_dlp_metadata(url):
         }
     return None
 
+def validate_url(url, platform):
+    """Ensure the URL belongs to the target platform."""
+    if not url: return False
+    domains = {
+        "tiktok": ["tiktok.com"],
+        "instagram": ["instagram.com"],
+        "facebook": ["facebook.com", "fb.watch"]
+    }
+    target_domains = domains.get(platform, [])
+    return any(domain in url for domain in target_domains)
+
 async def scrape_profile_playwright(url, platform, target_count=10):
     logger.info(f"Targeted scraping for {platform} profile: {url}")
     results = []
@@ -60,13 +71,23 @@ async def scrape_profile_playwright(url, platform, target_count=10):
             )
             page = await context.new_page()
             await page.goto(url)
-            await page.wait_for_timeout(5000)
+            # Scroll to load more content
+            for _ in range(5):
+                await page.mouse.wheel(0, 2000)
+                await page.wait_for_timeout(2000)
             
-            # Simple link extraction
+            # Broader link extraction
             links = await page.evaluate('''() => {
                 return Array.from(document.querySelectorAll('a'))
                     .map(a => a.href)
-                    .filter(href => href.includes('/p/') || href.includes('/reel/') || href.includes('/watch/') || href.includes('/videos/') || href.includes('/video/'));
+                    .filter(href => {
+                        const h = href.toLowerCase();
+                        return h.includes('/reel/') || 
+                               h.includes('/reels/') || 
+                               h.includes('/watch/') || 
+                               h.includes('/videos/') || 
+                               h.includes('/video/');
+                    });
             }''')
             
             unique_links = list(set(links))
@@ -74,44 +95,27 @@ async def scrape_profile_playwright(url, platform, target_count=10):
             
             for link in unique_links:
                 if len(results) >= target_count: break
+                if not validate_url(link, platform): continue
                 
-                # For TikTok/YouTube, yt-dlp is best
-                if "tiktok.com" in link or "youtube.com" in link:
-                    meta = await get_yt_dlp_metadata(link)
-                    if meta and meta.get("view_count", 0) > 0:
-                        results.append({
-                            "platform": platform,
-                            "data": {
-                                "url": link,
-                                "view_count": meta["view_count"],
-                                "likes": meta["likes"],
-                                "comments": meta["comments"],
-                                "shares": meta["shares"],
-                                "creator_handle": url.split('/')[-1],
-                                "caption": meta["caption"]
-                            }
-                        })
-                else:
-                    # For IG/FB, we might need to visit the link to get metadata if yt-dlp fails
-                    # Let's try yt-dlp first as it's faster
-                    meta = await get_yt_dlp_metadata(link)
-                    if meta and meta.get("view_count", 0) > 0:
-                        results.append({
-                            "platform": platform,
-                            "data": {
-                                "url": link,
-                                "view_count": meta["view_count"],
-                                "likes": meta["likes"],
-                                "comments": meta["comments"],
-                                "shares": meta["shares"],
-                                "creator_handle": url.split('/')[-1],
-                                "caption": meta["caption"]
-                            }
-                        })
-                    else:
-                        # Fallback: Just add placeholder if we can't get it, but user said NO placeholders
-                        # So we skip if no metadata
-                        pass
+                # Try getting metadata
+                meta = await get_yt_dlp_metadata(link)
+                if meta and meta.get("view_count", 0) > 0:
+                    results.append({
+                        "platform": platform,
+                        "url": link,
+                        "data": {
+                            "url": link,
+                            "view_count": meta["view_count"],
+                            "likes": meta["likes"],
+                            "comments": meta["comments"],
+                            "shares": meta["shares"],
+                            "caption": meta["caption"]
+                        },
+                        "view_count": meta["view_count"],
+                        "likes": meta["likes"],
+                        "comments": meta["comments"],
+                        "creator_handle": url.split('/')[-2] if '/' in url else "unknown"
+                    })
                         
             await browser.close()
     except Exception as e:
@@ -122,36 +126,22 @@ async def collect_platform_videos(platform, target=10):
     logger.info(f"Collecting {target} videos for {platform}...")
     results = []
     
-    # Platform specific sources
     sources = {
         "tiktok": [
             "https://www.tiktok.com/@thezeinakhoury",
-            "https://www.tiktok.com/@ladyrealtordxb",
-            "ytsearch15:dubai real estate",
-            "ytsearch15:abu dhabi property",
-            "ytsearch15:sharjah apartments",
-            "ytsearch15:UAE property investment",
-            "ytsearch15:خليجي عقارات"
+            "https://www.tiktok.com/@ladyrealtordxb"
         ],
         "instagram": [
+            "https://www.instagram.com/allsoppandallsopp/reels/",
             "https://www.instagram.com/bayutuae/reels/",
-            "https://www.instagram.com/farooq_syd/reels/",
-            "ytsearch15:dubai real estate instagram",
-            "ytsearch15:UAE property investment instagram",
-            "ytsearch15:خليجي عقارات instagram"
+            "https://www.instagram.com/dubairealestate/reels/",
+            "https://www.instagram.com/bhomesuae/reels/",
+            "https://www.instagram.com/stepan_k_official/reels/"
         ],
         "facebook": [
             "https://www.facebook.com/BetterhomesUAE/videos",
             "https://www.facebook.com/famproperties/videos",
-            "ytsearch15:dubai real estate facebook",
-            "ytsearch15:UAE property investment facebook"
-        ],
-        "youtube": [
-            "ytsearch15:dubai real estate #shorts",
-            "ytsearch15:abu dhabi property #shorts",
-            "ytsearch15:sharjah apartments #shorts",
-            "ytsearch15:UAE property investment #shorts",
-            "ytsearch15:خليجي عقارات #shorts"
+            "https://www.facebook.com/DamacPropertiesOfficial/videos"
         ]
     }
     
@@ -159,26 +149,30 @@ async def collect_platform_videos(platform, target=10):
         if len(results) >= target: break
         
         logger.info(f"Trying source: {source}")
-        # Use yt-dlp for everything as it's the most robust for metadata
-        # --max-downloads helps us not over-scrape
-        cmd = f"python3 -m yt_dlp --dump-json --flat-playlist --max-downloads 10 \"{source}\""
-        items = run_ytdlp(cmd)
         
-        for item in items:
-            if len(results) >= target: break
-            
-            # Check for real engagement
-            view_count = item.get("view_count", 0)
-            if view_count > 0:
-                results.append({
-                    "platform": platform,
-                    "data": item,
-                    "url": item.get("url", item.get("webpage_url")),
-                    "view_count": view_count,
-                    "likes": item.get("like_count", 0),
-                    "comments": item.get("comment_count", 0),
-                    "creator_handle": item.get("uploader", item.get("channel", "unknown"))
-                })
+        if "tiktok.com" in source:
+            # Use yt-dlp for TikTok
+            cmd = f"python3 -m yt_dlp --dump-json --flat-playlist --max-downloads 10 \"{source}\""
+            items = run_ytdlp(cmd)
+            for item in items:
+                if len(results) >= target: break
+                view_count = item.get("view_count", 0)
+                url = item.get("url", item.get("webpage_url"))
+                if view_count > 0 and validate_url(url, "tiktok"):
+                    results.append({
+                        "platform": "tiktok",
+                        "data": item,
+                        "url": url,
+                        "view_count": view_count,
+                        "likes": item.get("like_count", 0),
+                        "comments": item.get("comment_count", 0),
+                        "creator_handle": item.get("uploader", "unknown")
+                    })
+        else:
+            # Use Playwright for IG and FB profiles
+            profile_results = await scrape_profile_playwright(source, platform, target_count=target-len(results))
+            for pr in profile_results:
+                results.append(pr)
                 
     logger.info(f"Collected {len(results)} videos for {platform}.")
     return results
@@ -193,7 +187,7 @@ def main():
     logger.info("Starting UAE Real Estate Video Collection...")
     
     all_videos = []
-    platforms = ["tiktok", "youtube", "instagram", "facebook"]
+    platforms = ["tiktok", "instagram", "facebook"]
     
     error_log = []
     
