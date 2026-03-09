@@ -51,7 +51,7 @@ def summarize_video(client, video_data):
 
     try:
         response = client.chat(
-            model="open-mistral-nemo",
+            model="mistral-large-latest",
             response_format={"type": "json_object"},
             messages=[
                 ChatMessage(role="system", content=system_prompt),
@@ -131,7 +131,7 @@ def identify_content_opportunities(client, summarized_videos):
     
     try:
         response = client.chat(
-            model="open-mistral-nemo",
+            model="mistral-large-latest",
             response_format={"type": "json_object"},
             messages=[ChatMessage(role="user", content=prompt)]
         )
