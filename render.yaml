@@ -1,0 +1,17 @@
+services:
+  - type: worker
+    name: real-estate-bot
+    env: python
+    buildCommand: pip install -r requirements.txt && playwright install chromium && playwright install-deps
+    startCommand: python3 telegram_bot.py
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: GDRIVE_FOLDER_ID
+        sync: false
+      - key: GOOGLE_DRIVE_TOKEN_JSON
+        sync: false
+      - key: TELEGRAM_OWNER_ID
+        sync: false
